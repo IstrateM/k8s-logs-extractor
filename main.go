@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/astralkn/k8s-logs-extractor/pkg/kube"
+	"github.com/sergi/go-diff/diffmatchpatch"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 	"io/ioutil"
@@ -10,6 +12,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"time"
 )
 
 var (
@@ -38,6 +41,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 }
 
 func getConfigs(opts *options) ([]string, error) {
@@ -72,6 +76,7 @@ Flags:
 	flags.StringVar(&opts.kubeConfigPath, "kc", os.Getenv("HOME")+"/.kube/", "set cluster kubeconfig path")
 	flags.StringVar(&opts.outputFile, "o", "/cluster-logs/", "set logs output file")
 	flags.BoolVar(&opts.version, "version", false, "show version and exit")
+	flags.BoolVar(&opts.diff, "diff", false, "create diff file")
 	return flags, &opts
 }
 
@@ -79,6 +84,7 @@ type options struct {
 	kubeConfigPath string
 	outputFile     string
 	version        bool
+	diff           bool
 }
 
 func run(opts *options) error {
@@ -87,7 +93,7 @@ func run(opts *options) error {
 		return err
 	}
 	for i, s := range configs {
-		err := extractLogs(fmt.Sprintf("%s/cluster-%d", opts.outputFile, i), s)
+		err := extractLogs(fmt.Sprintf("%s/cluster-%d", opts.outputFile, i), s, opts.diff)
 		if err != nil {
 			return err
 		}
@@ -95,7 +101,7 @@ func run(opts *options) error {
 	return err
 }
 
-func extractLogs(path, kc string) error {
+func extractLogs(path, kc string, diff bool) error {
 	acc, err := kube.NewAccessor(kc, "")
 	if err != nil {
 		return err
@@ -107,7 +113,7 @@ func extractLogs(path, kc string) error {
 	}
 
 	for _, p := range allPods {
-		err := extractLogsForPod(path, acc, p)
+		err := extractLogsForPod(path, acc, p, diff)
 		if err != nil {
 			return err
 		}
@@ -115,7 +121,7 @@ func extractLogs(path, kc string) error {
 	return nil
 }
 
-func extractLogsForPod(path string, acc *kube.Accessor, p kubeApiCore.Pod) error {
+func extractLogsForPod(path string, acc *kube.Accessor, p kubeApiCore.Pod, diff bool) error {
 	logs, err := acc.Logs(p.Namespace, p.Name, "", false)
 	if err != nil {
 		var cont = getPodContainers(err)
@@ -124,12 +130,12 @@ func extractLogsForPod(path string, acc *kube.Accessor, p kubeApiCore.Pod) error
 			if err != nil {
 				return err
 			}
-			err = writeLogsToFile(path+"/"+p.Namespace, p.Name, logs)
+			err = writeLogsToFile(path+"/"+p.Namespace, p.Name+"_"+p1, logs, diff)
 			return err
 		}
 		return nil
 	} else {
-		err := writeLogsToFile(path+"/"+p.Namespace, p.Name, logs)
+		err := writeLogsToFile(path+"/"+p.Namespace, p.Name, logs, diff)
 		return err
 	}
 
@@ -147,7 +153,7 @@ func getPodContainers(err error) []string {
 	return cont
 }
 
-func writeLogsToFile(path, file string, logs string) error {
+func writeLogsToFile(path, file string, logs string, diffr bool) error {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		err := os.MkdirAll(path, os.ModePerm)
 		if err != nil {
@@ -155,7 +161,67 @@ func writeLogsToFile(path, file string, logs string) error {
 		}
 	}
 
-	f, err := os.OpenFile(path+"/"+file, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	filepath := path + "/" + file
+	_, err := os.Stat(filepath + ".txt")
+	if os.IsNotExist(err) {
+		err = createFile(filepath+".txt", logs)
+		if err != nil {
+			return err
+		}
+	} else if diffr {
+
+		content, err := ioutil.ReadFile(filepath + ".txt")
+		if err != nil {
+			return err
+		}
+		s := string(content)
+		dmp := diffmatchpatch.New()
+
+		diffs := dmp.DiffMain(s, logs, true)
+
+		fs := func(s, sign string) string {
+			split := strings.Split(s, "\n")
+			for i := range split {
+				split[i] = sign + split[i]
+			}
+			return strings.Join(split, "\n")
+		}
+
+		f := func(diffs []diffmatchpatch.Diff) string {
+			var text bytes.Buffer
+
+			for _, aDiff := range diffs {
+				if aDiff.Type == diffmatchpatch.DiffInsert {
+
+					_, _ = text.WriteString(fs(aDiff.Text, "+"))
+				}
+				if aDiff.Type == diffmatchpatch.DiffDelete {
+					_, _ = text.WriteString(fs(aDiff.Text, "-"))
+				}
+				if aDiff.Type == diffmatchpatch.DiffEqual {
+					_, _ = text.WriteString(aDiff.Text)
+				}
+			}
+			return text.String()
+		}
+
+		text := f(diffs)
+
+		err = createFile(filepath+"_diff_"+time.Now().Format(time.RFC3339)+".diff", text)
+		if err != nil {
+			return err
+		}
+	} else {
+		err = createFile(filepath+"_"+time.Now().Format(time.RFC3339)+".txt", logs)
+		if err != nil {
+			return err
+		}
+	}
+	return err
+}
+
+func createFile(filepath string, logs string) error {
+	f, err := os.OpenFile(filepath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}
@@ -164,5 +230,5 @@ func writeLogsToFile(path, file string, logs string) error {
 		return err
 	}
 	err = f.Close()
-	return err
+	return nil
 }
