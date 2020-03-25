@@ -17,11 +17,9 @@ import (
 
 var (
 	version = "master"
-	f       *os.File
 )
 
 func main() {
-	defer f.Close()
 	name := os.Args[0]
 	flags, opts := setupFlags(name)
 	switch err := flags.Parse(os.Args[1:]); {
@@ -41,7 +39,11 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
+	if opts.diff {
+		log.Println("Diffs extracted to ", opts.outputFile)
+	} else {
+		log.Println("Logs extracted to ", opts.outputFile)
+	}
 }
 
 func getConfigs(opts *options) ([]string, error) {
