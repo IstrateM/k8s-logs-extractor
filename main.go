@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"github.com/astralkn/k8s-logs-extractor/pkg/kube"
 	"github.com/sergi/go-diff/diffmatchpatch"
@@ -46,16 +47,36 @@ func main() {
 	}
 }
 
-func getConfigs(opts *options) ([]string, error) {
+func getConfigs(kcPath string) ([]string, error) {
 	var configs []string
-	dir, err := ioutil.ReadDir(opts.kubeConfigPath)
+	dir, err := ioutil.ReadDir(kcPath)
 	if err != nil {
 		return configs, err
 	}
+	m := regexp.MustCompile(`.*\.kubeconfig`)
 	for i := range dir {
-		conf := opts.kubeConfigPath + dir[i].Name()
-		configs = append(configs, conf)
-		fmt.Println(conf)
+		conf := kcPath + "/" + dir[i].Name()
+		fi, err := os.Stat(conf)
+		if err != nil {
+			return []string{}, err
+		}
+		switch mode := fi.Mode(); {
+		case mode.IsDir():
+			ec, err := getConfigs(conf)
+			if err != nil {
+				return []string{}, err
+			}
+			configs = append(configs, ec...)
+		case mode.IsRegular():
+			if m.MatchString(fi.Name()) {
+				configs = append(configs, conf)
+				fmt.Println(conf)
+			}
+		}
+	}
+
+	if len(configs) == 0 {
+		return configs, errors.New("no kubeconfig found")
 	}
 	return configs, err
 }
@@ -90,7 +111,7 @@ type options struct {
 }
 
 func run(opts *options) error {
-	configs, err := getConfigs(opts)
+	configs, err := getConfigs(opts.kubeConfigPath)
 	if err != nil {
 		return err
 	}
