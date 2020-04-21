@@ -38,7 +38,7 @@ func main() {
 	}
 	err := run(opts)
 	if err != nil {
-		log.Fatal(err)
+		log.Error(err.Error())
 	}
 	if opts.diff {
 		log.Println("Diffs extracted to ", opts.outputFile)
@@ -115,13 +115,14 @@ func run(opts *options) error {
 	if err != nil {
 		return err
 	}
+	var errs errs
 	for i, s := range configs {
 		err := extractLogs(fmt.Sprintf("%s/cluster-%d", opts.outputFile, i), s, opts.diff)
 		if err != nil {
-			return err
+			errs = append(errs, err)
 		}
 	}
-	return err
+	return errs
 }
 
 func extractLogs(path, kc string, diff bool) error {
@@ -134,12 +135,15 @@ func extractLogs(path, kc string, diff bool) error {
 	if err != nil {
 		return err
 	}
-
+	var errs errs
 	for _, p := range allPods {
 		err := extractLogsForPod(path, acc, p, diff)
 		if err != nil {
-			return err
+			errs = append(errs, err)
 		}
+	}
+	if len(errs) > 0 {
+		return errs
 	}
 	return nil
 }
@@ -254,4 +258,14 @@ func createFile(filepath string, logs string) error {
 	}
 	err = f.Close()
 	return nil
+}
+
+type errs []error
+
+func (es errs) Error() string {
+	buff := bytes.NewBufferString("multiple errors: \n")
+	for _, e := range es {
+		_, _ = fmt.Fprintf(buff, "\t%s\n", e)
+	}
+	return buff.String()
 }
