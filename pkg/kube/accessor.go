@@ -99,6 +99,10 @@ func (a *Accessor) Logs(namespace string, pod string, container string, previous
 	return a.ctl.logs(namespace, pod, container, previousLog)
 }
 
+func (a *Accessor) DumpInfo(outputDir, ns string) (string, error) {
+	return a.ctl.dumpInfo(outputDir, ns)
+}
+
 func (a *Accessor) GetNamespaces() ([]kubeApiCore.Namespace, error) {
 	var opts kubeApiMeta.ListOptions
 	n, err := a.set.CoreV1().Namespaces().List(opts)
@@ -106,4 +110,20 @@ func (a *Accessor) GetNamespaces() ([]kubeApiCore.Namespace, error) {
 		return nil, err
 	}
 	return n.Items, nil
+}
+
+func (a *Accessor) DescribeCM(cm, ns string) (string, error) {
+	return a.ctl.describeCm(cm, ns)
+}
+
+func (a *Accessor) DescribeSVC(svc, ns string) (string, error) {
+	return a.ctl.describeSVC(svc, ns)
+}
+
+func (a *Accessor) DescribeCRD(crd, ns string) (string, error) {
+	return a.ctl.describeCRD(crd, ns)
+}
+
+func (a *Accessor) DescribeCR(cr, crd, ns string) (string, error) {
+	return a.ctl.describeCR(cr, crd, ns)
 }
