@@ -123,7 +123,7 @@ func (c *kubectl) describeCR(cr, crd, ns string) (string, error) {
 }
 
 func (c *kubectl) pods(pod string, ns string) (string, error) {
-	cmd := fmt.Sprintf("kubectl get pods %s %s %s",
+	cmd := fmt.Sprintf("kubectl get pods %s %s %s -o wide",
 		pod, c.configArg(), namespaceArg(ns))
 
 	s, err := shell.Execute(true, cmd)
