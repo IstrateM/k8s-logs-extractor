@@ -70,6 +70,19 @@ func (c *kubectl) configArg() string {
 	return configArg(c.kubeConfig)
 }
 
+func (c *kubectl) describePod(pod, ns string) (string, error) {
+	cmd := fmt.Sprintf("kubectl describe pod %s %s %s",
+		c.configArg(), pod, namespaceArg(ns))
+
+	s, err := shell.Execute(true, cmd)
+
+	if err == nil {
+		return s, nil
+	}
+
+	return "", fmt.Errorf("%v: %s", err, s)
+}
+
 func (c *kubectl) describeCm(cm, ns string) (string, error) {
 	cmd := fmt.Sprintf("kubectl describe cm %s %s %s",
 		c.configArg(), cm, namespaceArg(ns))

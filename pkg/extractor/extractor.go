@@ -25,11 +25,30 @@ func (_ PodExtractor) Extract(acc *kube.Accessor, outputDir string) error {
 	if err != nil {
 		return err
 	}
-	s, err := acc.GetPods("", "all")
+	podList, err := acc.GetPods("", "all")
 	if err != nil {
 		return err
 	}
-	err = writeStringToFile(outputDir, "pods", s, OUT)
+	err = writeStringToFile(outputDir, "pods", podList, OUT)
+	if err != nil {
+		return err
+	}
+	podDescribe, err := acc.DescribePod("", "all")
+	if err != nil || podDescribe == "No resources found" || podDescribe == "" {
+		return err
+	}
+	split := strings.Split(podDescribe, "\nName:")
+	for i, pod := range split {
+		name := getName(pod)
+		if i != 0 {
+			pod = "Name:" + pod
+		}
+		//TODO: add namespace as well
+		err = writeStringToFile(filepath.Join(outputDir, "pods-describe"), name, pod, YAML)
+		if err != nil {
+			return err
+		}
+	}
 	return err
 }
 
