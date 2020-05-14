@@ -121,12 +121,12 @@ func run(opts *options) error {
 	}
 	var errs errs
 	var wg sync.WaitGroup
-	for _, s := range configs {
-		acc, err := kube.NewAccessor(s, "")
+	for _, cfg := range configs {
+		acc, err := kube.NewAccessor(cfg, "")
 		if err != nil {
 			return err
 		}
-		str := strings.Split(s, "/")
+		str := strings.Split(cfg, "/")
 		cluster := str[len(str)-1]
 		if opts.pod {
 			wg.Add(1)

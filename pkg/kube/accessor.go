@@ -27,10 +27,6 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-const (
-	workDirPrefix = "cnns-kube-accessor-"
-)
-
 // Accessor is a helper for accessing Kubernetes programmatically. It bundles some of the high-level
 // operations that is frequently used by the test framework.
 type Accessor struct {
@@ -78,20 +74,8 @@ func NewAccessor(kubeConfig string, baseWorkDir string) (*Accessor, error) {
 	}, nil
 }
 
-func (a *Accessor) GetAllPods() ([]kubeApiCore.Pod, error) {
-	namespaces, err := a.GetNamespaces()
-	if err != nil {
-		return nil, err
-	}
-	var list []kubeApiCore.Pod
-	for n := range namespaces {
-		l, err := a.set.CoreV1().Pods(namespaces[n].Name).List(kubeApiMeta.ListOptions{})
-		if err != nil {
-			return []kubeApiCore.Pod{}, err
-		}
-		list = append(list, l.Items...)
-	}
-	return list, nil
+func (a *Accessor) GetPods(pod, ns string) (string, error) {
+	return a.ctl.pods(pod, ns)
 }
 
 // Logs calls the logs command for the specified pod, with -c, if container is specified.

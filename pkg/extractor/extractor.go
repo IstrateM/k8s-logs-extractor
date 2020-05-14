@@ -7,6 +7,12 @@ import (
 	"strings"
 )
 
+const (
+	//NONE = ""
+	YAML = ".yaml"
+	OUT  = ".out"
+)
+
 type Extractor interface {
 	Extract(acc *kube.Accessor, outputDir string) error
 }
@@ -16,7 +22,14 @@ type PodExtractor struct {
 
 func (_ PodExtractor) Extract(acc *kube.Accessor, outputDir string) error {
 	_, err := acc.DumpInfo(outputDir, "all")
-
+	if err != nil {
+		return err
+	}
+	s, err := acc.GetPods("", "all")
+	if err != nil {
+		return err
+	}
+	err = writeStringToFile(outputDir, "pods", s, OUT)
 	return err
 }
 
@@ -34,7 +47,7 @@ func (_ CMExtractor) Extract(acc *kube.Accessor, outputDir string) error {
 		if i != 0 {
 			cm = "Name:" + cm
 		}
-		err = writeStringToFile(filepath.Join(outputDir, "cm"), name, cm)
+		err = writeStringToFile(filepath.Join(outputDir, "cm"), name, cm, YAML)
 		if err != nil {
 			return err
 		}
@@ -56,7 +69,7 @@ func (_ SVCExtractor) Extract(acc *kube.Accessor, outputDir string) error {
 		if i != 0 {
 			svc = "Name:" + svc
 		}
-		err = writeStringToFile(filepath.Join(outputDir, "svc"), name, svc)
+		err = writeStringToFile(filepath.Join(outputDir, "svc"), name, svc, YAML)
 		if err != nil {
 			return err
 		}
@@ -79,7 +92,7 @@ func (_ CRDExtractor) Extract(acc *kube.Accessor, outputDir string) error {
 			crd = "Name:" + crd
 		}
 		dir := filepath.Join(outputDir, "crd", name)
-		err = writeStringToFile(dir, name, crd)
+		err = writeStringToFile(dir, name, crd, YAML)
 		if err != nil {
 			return err
 		}
@@ -105,7 +118,7 @@ func (_ CRExtractor) Extract(acc *kube.Accessor, outputDir, crd string) error {
 		if i != 0 {
 			crd = "Name:" + crd
 		}
-		err = writeStringToFile(filepath.Join(outputDir, "instances"), name, crd)
+		err = writeStringToFile(filepath.Join(outputDir, "instances"), name, crd, YAML)
 		if err != nil {
 			return err
 		}
@@ -126,7 +139,7 @@ func createFile(filepath string, logs string) error {
 	return nil
 }
 
-func writeStringToFile(path, file string, str string) error {
+func writeStringToFile(path, file, str, fileType string) error {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		err := os.MkdirAll(path, os.ModePerm)
 		if err != nil {
@@ -135,9 +148,9 @@ func writeStringToFile(path, file string, str string) error {
 	}
 
 	fpath := filepath.Join(path, file)
-	_, err := os.Stat(fpath + ".yaml")
+	_, err := os.Stat(fpath + fileType)
 	if os.IsNotExist(err) {
-		err = createFile(fpath+".yaml", str)
+		err = createFile(fpath+fileType, str)
 		if err != nil {
 			return err
 		}

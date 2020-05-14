@@ -122,6 +122,19 @@ func (c *kubectl) describeCR(cr, crd, ns string) (string, error) {
 	return "", fmt.Errorf("%v: %s", err, s)
 }
 
+func (c *kubectl) pods(pod string, ns string) (string, error) {
+	cmd := fmt.Sprintf("kubectl get pods %s %s %s",
+		pod, c.configArg(), namespaceArg(ns))
+
+	s, err := shell.Execute(true, cmd)
+
+	if err == nil {
+		return s, nil
+	}
+
+	return "", fmt.Errorf("%v: %s", err, s)
+}
+
 func configArg(kubeConfig string) string {
 	if kubeConfig != "" {
 		return fmt.Sprintf("--kubeconfig=%s", kubeConfig)
