@@ -97,7 +97,7 @@ func (a *Accessor) GetNamespaces() ([]kubeApiCore.Namespace, error) {
 }
 
 func (a *Accessor) DescribePod(pod, ns string) (string, error) {
-	return a.ctl.describeCm(pod, ns)
+	return a.ctl.describePod(pod, ns)
 }
 
 func (a *Accessor) DescribeCM(cm, ns string) (string, error) {
